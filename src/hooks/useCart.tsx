@@ -1,4 +1,4 @@
-import { createContext, ReactNode, useContext, useState } from 'react';
+import { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
 import { api } from '../services/api';
 import { Product, Stock } from '../types';
@@ -23,20 +23,55 @@ const CartContext = createContext<CartContextData>({} as CartContextData);
 
 export function CartProvider({ children }: CartProviderProps): JSX.Element {
   const [cart, setCart] = useState<Product[]>(() => {
-    // const storagedCart = Buscar dados do localStorage
+    const storagedCart = localStorage.getItem('@RocketShoes:cart')
 
-    // if (storagedCart) {
-    //   return JSON.parse(storagedCart);
-    // }
+    if (storagedCart) {
+      return JSON.parse(storagedCart);
+    }
 
     return [];
   });
 
+  useEffect(() => {
+    localStorage.setItem('@RocketShoes:cart', JSON.stringify(cart))
+  }, [cart])
+
   const addProduct = async (productId: number) => {
     try {
-      // TODO
+      const productStock = await api.get<Stock>(`/stock/${productId}`)
+        .then(response => {
+          return response.data.amount
+        })
+
+      const productCart = cart.find(product => product.id === productId)
+
+      if (!productCart) {
+        const product = await api.get<Product>(`/products/${productId}`)
+          .then(response => {
+            return response.data
+          })
+
+        setCart([...cart, { ...product, amount: 1 }])
+
+        return
+      }
+
+      if (productStock < (productCart.amount + 1)) {
+        toast.error('Quantidade solicitada fora de estoque');
+        return
+      }
+
+      const newCart = cart.map(product => {
+        if (product.id === productId) {
+          product = { ...product, amount: product.amount+1 }
+        }
+
+        return product
+      })
+      setCart(newCart)
+
     } catch {
-      // TODO
+      toast.error('Erro na adição do produto');
     }
   };
 
@@ -44,7 +79,7 @@ export function CartProvider({ children }: CartProviderProps): JSX.Element {
     try {
       // TODO
     } catch {
-      // TODO
+      toast.error('Erro na remoção do produto');
     }
   };
 
@@ -53,9 +88,9 @@ export function CartProvider({ children }: CartProviderProps): JSX.Element {
     amount,
   }: UpdateProductAmount) => {
     try {
-      // TODO
+
     } catch {
-      // TODO
+      toast.error('Erro na alteração de quantidade do produto');
     }
   };
 
